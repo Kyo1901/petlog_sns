@@ -8,10 +8,11 @@ import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CloseIcon from '@mui/icons-material/Close';
+import ImageSearchIcon from '@mui/icons-material/ImageSearch';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppHeader from '../components/common/app-header';
+import UnsplashPicker from '../components/ui/unsplash-picker';
 import { useAuth } from '../hooks/use-auth';
 import { createPost, fetchPostById, searchHashtags, updatePost } from '../utils/posts-api';
 
@@ -19,7 +20,7 @@ const MAX_IMAGES = 10;
 
 /**
  * CreatePostPage 컴포넌트 — 게시물 작성 · 수정
- * ※ 수업 실습 단계: 사진 업로드 대신 이미지 URL을 저장하는 방식 사용
+ * ※ 수업 실습 단계: 사진 업로드 대신 Unsplash API 검색으로 이미지 URL을 저장
  *
  * Props: 없음 (URL 파라미터 postId 있으면 수정 모드)
  *
@@ -37,6 +38,7 @@ function CreatePostPage() {
   const [location, setLocation] = useState('');
   const [imageUrls, setImageUrls] = useState([]);
   const [imageInput, setImageInput] = useState('');
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [tags, setTags] = useState([]);
   const [tagOptions, setTagOptions] = useState([]);
   const [error, setError] = useState('');
@@ -65,10 +67,19 @@ function CreatePostPage() {
     })();
   }, [isEdit, postId, user, navigate]);
 
-  /** 이미지 URL 추가 */
+  /** Unsplash에서 선택한 사진들 추가 */
+  const handleAddFromUnsplash = (urls) => {
+    setImageUrls((prev) => [...prev, ...urls].slice(0, MAX_IMAGES));
+    setError('');
+  };
+
+  /** 이미지 URL 직접 추가 (보조 수단) */
   const handleAddImage = () => {
     const url = imageInput.trim();
-    if (!url) return;
+    if (!url) {
+      setError('이미지 URL을 입력한 뒤 추가 버튼을 눌러주세요. (Unsplash 검색 버튼을 이용하면 더 편해요)');
+      return;
+    }
     if (imageUrls.length >= MAX_IMAGES) {
       setError(`사진은 최대 ${MAX_IMAGES}장까지 추가할 수 있습니다.`);
       return;
@@ -76,13 +87,6 @@ function CreatePostPage() {
     setImageUrls((prev) => [...prev, url]);
     setImageInput('');
     setError('');
-  };
-
-  /** 샘플 이미지 추가 (실습용 랜덤 이미지) */
-  const handleAddSample = () => {
-    if (imageUrls.length >= MAX_IMAGES) return;
-    const seed = `petlog-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    setImageUrls((prev) => [...prev, `https://picsum.photos/seed/${seed}/900/900`]);
   };
 
   /** 해시태그 자동완성 옵션 검색 */
@@ -156,11 +160,21 @@ function CreatePostPage() {
           <Typography sx={ { fontSize: '0.85rem', fontWeight: 700, mb: 1 } }>
             사진 ({ imageUrls.length }/{ MAX_IMAGES })
           </Typography>
-          <Box sx={ { display: 'flex', gap: 1 } }>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={ () => setIsPickerOpen(true) }
+            disabled={ imageUrls.length >= MAX_IMAGES }
+            startIcon={ <ImageSearchIcon /> }
+            sx={ { py: 1.2, fontWeight: 700 } }
+          >
+            Unsplash에서 사진 검색해서 추가
+          </Button>
+          <Box sx={ { display: 'flex', gap: 1, mt: 1 } }>
             <TextField
               value={ imageInput }
               onChange={ (event) => setImageInput(event.target.value) }
-              placeholder="이미지 URL 붙여넣기 (https://...)"
+              placeholder="또는 이미지 URL 직접 붙여넣기 (https://...)"
               size="small"
               fullWidth
               onKeyDown={ (event) => {
@@ -174,14 +188,6 @@ function CreatePostPage() {
               추가
             </Button>
           </Box>
-          <Button
-            onClick={ handleAddSample }
-            size="small"
-            startIcon={ <AddPhotoAlternateIcon /> }
-            sx={ { mt: 1, fontSize: '0.75rem' } }
-          >
-            샘플 이미지 추가 (실습용)
-          </Button>
 
           { imageUrls.length > 0 && (
             <Box sx={ { display: 'flex', gap: 1, overflowX: 'auto', mt: 1.5, pb: 1 } }>
@@ -268,6 +274,14 @@ function CreatePostPage() {
 
         { error && <Alert severity="error">{ error }</Alert> }
       </Box>
+
+      {/* Unsplash 사진 검색 다이얼로그 */}
+      <UnsplashPicker
+        isOpen={ isPickerOpen }
+        onClose={ () => setIsPickerOpen(false) }
+        onSelect={ handleAddFromUnsplash }
+        maxCount={ MAX_IMAGES - imageUrls.length }
+      />
     </Box>
   );
 }
