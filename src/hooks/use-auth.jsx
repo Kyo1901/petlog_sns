@@ -75,6 +75,10 @@ export function AuthProvider({ children }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+      /* 비밀번호 재설정 링크로 진입한 경우 → 새 비밀번호 설정 화면으로 이동 */
+      if (event === 'PASSWORD_RECOVERY') {
+        window.location.hash = '#/reset-password';
+      }
       /* onAuthStateChange 콜백 안에서 supabase 호출 시 교착 방지를 위해 큐로 미룸 */
       setTimeout(() => {
         if (next?.user) {

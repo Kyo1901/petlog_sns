@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
  * 게시물 · 좋아요 · 팔로우 · 해시태그 관련 Supabase API 유틸리티
  */
 
-const POST_SELECT = `
+export const POST_SELECT = `
   *,
   pet:petlog_pet_profiles (id, name, species, breed, profile_image_url, user_id),
   images:petlog_post_images (id, image_url, sort_order),
@@ -12,7 +12,7 @@ const POST_SELECT = `
 `;
 
 /** 조회 결과를 화면에서 쓰기 좋은 형태로 정리 */
-function normalizePost(post) {
+export function normalizePost(post) {
   return {
     ...post,
     images: [...(post.images ?? [])].sort((a, b) => a.sort_order - b.sort_order),

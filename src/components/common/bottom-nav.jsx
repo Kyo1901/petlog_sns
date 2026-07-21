@@ -12,7 +12,9 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import PersonOutlinedIcon from '@mui/icons-material/PersonOutlined';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useNotifications } from '../../hooks/use-notifications';
 
 /**
  * BottomNav 컴포넌트 — 하단 탭바 [홈] [탐색] [+작성 FAB] [알림] [마이]
@@ -25,6 +27,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { unreadCount, refreshUnread } = useNotifications();
+
+  /* 탭 이동 시마다 안 읽은 알림 수 갱신 */
+  useEffect(() => {
+    refreshUnread();
+  }, [location.pathname, refreshUnread]);
 
   const tabs = [
     { path: '/', label: '홈', icon: <HomeOutlinedIcon />, activeIcon: <HomeIcon /> },
@@ -52,7 +60,7 @@ function BottomNav() {
         } }
       >
         { tab.label === '알림' ? (
-          <Badge badgeContent={ 0 } color="error">{ icon }</Badge>
+          <Badge badgeContent={ unreadCount } max={ 99 } color="error">{ icon }</Badge>
         ) : icon }
         <Typography sx={ { fontSize: '0.65rem', fontWeight: isActive ? 700 : 400 } }>
           { tab.label }

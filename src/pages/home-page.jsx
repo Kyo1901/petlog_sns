@@ -7,15 +7,18 @@ import Tabs from '@mui/material/Tabs';
 import PetsIcon from '@mui/icons-material/Pets';
 import { useNavigate } from 'react-router-dom';
 import AppHeader from '../components/common/app-header';
+import PullToRefresh from '../components/common/pull-to-refresh';
 import EmptyState from '../components/ui/empty-state';
 import PostCard from '../components/ui/post-card';
 import { useAuth } from '../hooks/use-auth';
+import { useBlocks } from '../hooks/use-blocks';
 import {
   fetchFollowingIds,
   fetchLikedPostIds,
   fetchPosts,
   setLike,
 } from '../utils/posts-api';
+import { fetchSavedPostIds, savePost, unsavePost } from '../utils/saved-api';
 
 const PAGE_SIZE = 10;
 
@@ -30,10 +33,12 @@ const PAGE_SIZE = 10;
  */
 function HomePage() {
   const navigate = useNavigate();
-  const { activePet } = useAuth();
+  const { user, activePet } = useAuth();
+  const { blockedUserIds } = useBlocks();
   const [tab, setTab] = useState(0);
   const [posts, setPosts] = useState([]);
   const [likedIds, setLikedIds] = useState(new Set());
+  const [savedIds, setSavedIds] = useState(new Set());
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,15 +55,19 @@ function HomePage() {
         followingPetIds = [...ids, activePet.id];
       }
       const rows = await fetchPosts({ followingPetIds, page: targetPage, pageSize: PAGE_SIZE });
-      const liked = await fetchLikedPostIds(activePet.id, rows.map((p) => p.id));
+      const [liked, saved] = await Promise.all([
+        fetchLikedPostIds(activePet.id, rows.map((p) => p.id)),
+        fetchSavedPostIds(user?.id, rows.map((p) => p.id)),
+      ]);
       setPosts((prev) => (isReset ? rows : [...prev, ...rows]));
       setLikedIds((prev) => (isReset ? liked : new Set([...prev, ...liked])));
+      setSavedIds((prev) => (isReset ? saved : new Set([...prev, ...saved])));
       setHasMore(rows.length === PAGE_SIZE);
       setPage(targetPage);
     } finally {
       setIsLoading(false);
     }
-  }, [activePet, tab]);
+  }, [activePet, tab, user]);
 
   /* 탭 변경 · 펫 변경 시 피드 초기화 */
   useEffect(() => {
@@ -109,6 +118,33 @@ function HomePage() {
     }
   };
 
+  /** 저장 토글 — 피드에서는 바로 저장(미분류)/해제, 컬렉션 분류는 상세 페이지에서 */
+  const handleToggleSave = async (post) => {
+    if (!user) return;
+    const isSaved = savedIds.has(post.id);
+    setSavedIds((prev) => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(post.id);
+      else next.add(post.id);
+      return next;
+    });
+    try {
+      if (isSaved) await unsavePost(user.id, post.id);
+      else await savePost({ userId: user.id, postId: post.id });
+    } catch {
+      /* 실패 시 원복 */
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(post.id);
+        else next.delete(post.id);
+        return next;
+      });
+    }
+  };
+
+  /* 차단한 사용자의 게시물은 노출 제외 */
+  const visiblePosts = posts.filter((post) => !blockedUserIds.has(post.pet?.user_id));
+
   return (
     <Box>
       <AppHeader />
@@ -122,16 +158,20 @@ function HomePage() {
         <Tab label="추천" sx={ { fontWeight: 700, minHeight: 44 } } />
       </Tabs>
 
-      { posts.map((post) => (
-        <PostCard
-          key={ post.id }
-          post={ post }
-          isLiked={ likedIds.has(post.id) }
-          onToggleLike={ handleToggleLike }
-        />
-      )) }
+      <PullToRefresh onRefresh={ () => loadPage(0, true) }>
+        { visiblePosts.map((post) => (
+          <PostCard
+            key={ post.id }
+            post={ post }
+            isLiked={ likedIds.has(post.id) }
+            onToggleLike={ handleToggleLike }
+            isSaved={ savedIds.has(post.id) }
+            onToggleSave={ handleToggleSave }
+          />
+        )) }
+      </PullToRefresh>
 
-      { !isLoading && posts.length === 0 && (
+      { !isLoading && visiblePosts.length === 0 && (
         tab === 0 ? (
           <EmptyState
             icon={ <PetsIcon /> }

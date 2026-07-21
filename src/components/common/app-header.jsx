@@ -12,12 +12,13 @@ import { useNavigate } from 'react-router-dom';
  * Props:
  * @param {string} title - 페이지 제목 (없으면 PetLog 로고 표시) [Optional]
  * @param {boolean} hasBack - 뒤로가기 버튼 표시 여부 [Optional, 기본값: false]
+ * @param {function} onBack - 뒤로가기 클릭 시 실행할 함수 (없으면 navigate(-1)) [Optional]
  * @param {node} children - 우측 액션 영역 [Optional]
  *
  * Example usage:
  * <AppHeader title="게시물" hasBack />
  */
-function AppHeader({ title, hasBack = false, children }) {
+function AppHeader({ title, hasBack = false, onBack, children }) {
   const navigate = useNavigate();
 
   return (
@@ -33,7 +34,7 @@ function AppHeader({ title, hasBack = false, children }) {
     >
       <Toolbar sx={ { minHeight: { xs: 56 }, px: 2, gap: 1 } }>
         { hasBack && (
-          <IconButton edge="start" onClick={ () => navigate(-1) } aria-label="뒤로가기" sx={ { color: 'text.primary' } }>
+          <IconButton edge="start" onClick={ () => (onBack ? onBack() : navigate(-1)) } aria-label="뒤로가기" sx={ { color: 'text.primary' } }>
             <ArrowBackIcon />
           </IconButton>
         ) }

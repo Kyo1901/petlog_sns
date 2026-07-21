@@ -5,6 +5,9 @@ import { HashRouter, Route, Routes } from 'react-router-dom';
 import MainLayout from './components/common/main-layout';
 import ProtectedRoute from './components/common/protected-route';
 import { AuthProvider } from './hooks/use-auth';
+import { BlocksProvider } from './hooks/use-blocks';
+import { NotificationsProvider } from './hooks/use-notifications';
+import BlockedUsersPage from './pages/blocked-users-page';
 import CreatePostPage from './pages/create-post-page';
 import ExplorePage from './pages/explore-page';
 import HomePage from './pages/home-page';
@@ -14,6 +17,7 @@ import OnboardingPage from './pages/onboarding-page';
 import PetFormPage from './pages/pet-form-page';
 import PostDetailPage from './pages/post-detail-page';
 import ProfilePage from './pages/profile-page';
+import ResetPasswordPage from './pages/reset-password-page';
 import SignupPage from './pages/signup-page';
 
 /**
@@ -98,6 +102,8 @@ function BrandPanel() {
 function App() {
   return (
     <AuthProvider>
+      <NotificationsProvider>
+      <BlocksProvider>
       <HashRouter>
         <Box
           sx={ (theme) => ({
@@ -123,6 +129,7 @@ function App() {
             <Routes>
               <Route path="/login" element={ <LoginPage /> } />
               <Route path="/signup" element={ <SignupPage /> } />
+              <Route path="/reset-password" element={ <ResetPasswordPage /> } />
               <Route
                 path="/onboarding"
                 element={ (
@@ -169,6 +176,14 @@ function App() {
                 ) }
               />
               <Route
+                path="/settings/blocks"
+                element={ (
+                  <ProtectedRoute>
+                    <BlockedUsersPage />
+                  </ProtectedRoute>
+                ) }
+              />
+              <Route
                 path="/pets/new"
                 element={ (
                   <ProtectedRoute>
@@ -190,6 +205,8 @@ function App() {
           <Box sx={ { display: { xs: 'none', lg: 'block' }, width: 360, flexShrink: 0 } } />
         </Box>
       </HashRouter>
+      </BlocksProvider>
+      </NotificationsProvider>
     </AuthProvider>
   );
 }

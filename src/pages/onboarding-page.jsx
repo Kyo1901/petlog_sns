@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
+import Link from '@mui/material/Link';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from 'react-router-dom';
 import PetForm from '../components/ui/pet-form';
@@ -16,7 +17,13 @@ import { useAuth } from '../hooks/use-auth';
  */
 function OnboardingPage() {
   const navigate = useNavigate();
-  const { user, refreshPets, setActivePetId } = useAuth();
+  const { user, refreshPets, setActivePetId, signOut } = useAuth();
+
+  /** 로그아웃 후 로그인 화면으로 이동 (다른 계정으로 시작하고 싶을 때) */
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   /** 첫 펫 프로필 저장 후 홈으로 이동 */
   const handleSubmit = async (values) => {
@@ -44,6 +51,18 @@ function OnboardingPage() {
           </Typography>
         </Box>
         <PetForm onSubmit={ handleSubmit } submitLabel="등록하고 시작하기" />
+
+        <Typography sx={ { textAlign: 'center', fontSize: '0.85rem', color: 'text.secondary', mt: 3 } }>
+          다른 계정으로 시작할까요?{ ' ' }
+          <Link
+            component="button"
+            type="button"
+            onClick={ handleSignOut }
+            sx={ { fontWeight: 700, verticalAlign: 'baseline' } }
+          >
+            로그아웃하고 로그인 화면으로
+          </Link>
+        </Typography>
       </Container>
     </Box>
   );

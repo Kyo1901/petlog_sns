@@ -8,13 +8,18 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import CollectionsIcon from '@mui/icons-material/Collections';
 import GridOnIcon from '@mui/icons-material/GridOn';
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { useNavigate, useParams } from 'react-router-dom';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import AppHeader from '../components/common/app-header';
 import PetAvatar from '../components/common/pet-avatar';
 import EmptyState from '../components/ui/empty-state';
+import HealthTimeline from '../components/ui/health-timeline';
+import SavedPostsTab from '../components/ui/saved-posts-tab';
 import { useAuth } from '../hooks/use-auth';
 import { supabase } from '../lib/supabase';
 import { calcAge, daysUntilBirthday } from '../utils/format-date';
@@ -39,7 +44,10 @@ import {
 function ProfilePage() {
   const { petId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, profile, pets, activePet, setActivePetId, signOut } = useAuth();
+  /* ?tab=health 로 진입하면 건강 탭을 바로 표시 (알림 리마인더 클릭 등) */
+  const [contentTab, setContentTab] = useState(searchParams.get('tab') === 'health' ? 'health' : 'posts');
 
   const targetPetId = petId ? Number(petId) : activePet?.id;
   const myPet = pets.find((p) => p.id === targetPetId) ?? null;
@@ -122,6 +130,9 @@ function ProfilePage() {
         <AppHeader title="마이페이지">
           <IconButton onClick={ () => navigate('/pets/new') } aria-label="펫 추가" sx={ { color: 'text.primary' } }>
             <AddIcon />
+          </IconButton>
+          <IconButton onClick={ () => navigate('/settings/blocks') } aria-label="설정 (차단 목록)" sx={ { color: 'text.primary' } }>
+            <SettingsOutlinedIcon />
           </IconButton>
           <IconButton onClick={ signOut } aria-label="로그아웃" sx={ { color: 'text.primary' } }>
             <LogoutIcon />
@@ -225,13 +236,48 @@ function ProfilePage() {
             </Box>
           </Box>
 
-          {/* 게시물 그리드 */}
+          {/* 콘텐츠 영역 — 내 펫: 게시물/건강 탭, 타 펫: 게시물만 */}
           <Box sx={ { borderTop: 1, borderColor: 'divider' } }>
-            <Box sx={ { display: 'flex', alignItems: 'center', gap: 0.7, px: 2, py: 1.2, color: 'text.secondary' } }>
-              <GridOnIcon sx={ { fontSize: 16 } } />
-              <Typography sx={ { fontSize: '0.8rem', fontWeight: 700 } }>게시물</Typography>
-            </Box>
-            { posts.length === 0 ? (
+            { isMyPet ? (
+              <Tabs
+                value={ contentTab }
+                onChange={ (event, next) => setContentTab(next) }
+                variant="fullWidth"
+                sx={ { borderBottom: 1, borderColor: 'divider', minHeight: 44 } }
+              >
+                <Tab
+                  value="posts"
+                  icon={ <GridOnIcon sx={ { fontSize: 18 } } /> }
+                  iconPosition="start"
+                  label="게시물"
+                  sx={ { fontWeight: 700, minHeight: 44 } }
+                />
+                <Tab
+                  value="health"
+                  icon={ <HealthAndSafetyIcon sx={ { fontSize: 18 } } /> }
+                  iconPosition="start"
+                  label="건강"
+                  sx={ { fontWeight: 700, minHeight: 44 } }
+                />
+                <Tab
+                  value="saved"
+                  icon={ <BookmarkBorderIcon sx={ { fontSize: 18 } } /> }
+                  iconPosition="start"
+                  label="저장됨"
+                  sx={ { fontWeight: 700, minHeight: 44 } }
+                />
+              </Tabs>
+            ) : (
+              <Box sx={ { display: 'flex', alignItems: 'center', gap: 0.7, px: 2, py: 1.2, color: 'text.secondary' } }>
+                <GridOnIcon sx={ { fontSize: 16 } } />
+                <Typography sx={ { fontSize: '0.8rem', fontWeight: 700 } }>게시물</Typography>
+              </Box>
+            ) }
+            { isMyPet && contentTab === 'health' ? (
+              <HealthTimeline petId={ pet.id } />
+            ) : isMyPet && contentTab === 'saved' ? (
+              <SavedPostsTab userId={ user.id } />
+            ) : posts.length === 0 ? (
               <EmptyState
                 icon={ <CollectionsIcon /> }
                 title="아직 게시물이 없어요"

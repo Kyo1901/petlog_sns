@@ -7,6 +7,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import FlagOutlinedIcon from '@mui/icons-material/FlagOutlined';
 import PetAvatar from '../common/pet-avatar';
 import { formatRelativeTime } from '../../utils/format-date';
 
@@ -23,11 +24,12 @@ const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '👍'];
  * @param {function} onReply - 답글 달기 클릭 시 실행 (comment 전달) [Optional]
  * @param {function} onDelete - 삭제 클릭 시 실행 (comment 전달) [Optional]
  * @param {function} onToggleReaction - 이모지 반응 토글 (comment, emoji, isActive 전달) [Required]
+ * @param {function} onReport - 타인 댓글 신고 클릭 시 실행 (comment 전달, 없으면 버튼 숨김) [Optional]
  *
  * Example usage:
  * <CommentItem comment={ comment } myPetId={ 1 } onToggleReaction={ handleReaction } />
  */
-function CommentItem({ comment, myPetId, myUserId, isReply = false, onReply, onDelete, onToggleReaction }) {
+function CommentItem({ comment, myPetId, myUserId, isReply = false, onReply, onDelete, onToggleReaction, onReport }) {
   const [anchorEl, setAnchorEl] = useState(null);
 
   /* 이모지별 집계: { emoji: { count, isMine } } */
@@ -92,6 +94,16 @@ function CommentItem({ comment, myPetId, myUserId, isReply = false, onReply, onD
               sx={ { width: 26, height: 26, color: 'text.secondary' } }
             >
               <DeleteOutlineIcon sx={ { fontSize: 16 } } />
+            </IconButton>
+          ) }
+          { !isMyComment && onReport && (
+            <IconButton
+              size="small"
+              onClick={ () => onReport(comment) }
+              aria-label="댓글 신고"
+              sx={ { width: 26, height: 26, color: 'text.secondary' } }
+            >
+              <FlagOutlinedIcon sx={ { fontSize: 16 } } />
             </IconButton>
           ) }
         </Box>

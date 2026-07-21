@@ -5,6 +5,8 @@ import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Snackbar from '@mui/material/Snackbar';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlined';
@@ -22,11 +24,13 @@ import { formatRelativeTime } from '../../utils/format-date';
  * @param {object} post - 게시물 객체 (pet, images, hashtags 포함) [Required]
  * @param {boolean} isLiked - 현재 펫의 좋아요 여부 [Required]
  * @param {function} onToggleLike - 좋아요 토글 시 실행할 함수 (post 전달) [Required]
+ * @param {boolean} isSaved - 보호자의 저장 여부 [Optional, 기본값: false]
+ * @param {function} onToggleSave - 저장 토글 시 실행할 함수 (post 전달, 없으면 버튼 숨김) [Optional]
  *
  * Example usage:
  * <PostCard post={ post } isLiked={ liked } onToggleLike={ handleLike } />
  */
-function PostCard({ post, isLiked, onToggleLike }) {
+function PostCard({ post, isLiked, onToggleLike, isSaved = false, onToggleSave }) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
@@ -133,6 +137,15 @@ function PostCard({ post, isLiked, onToggleLike }) {
         <IconButton onClick={ handleShare } aria-label="공유" sx={ { width: 44, height: 44, color: 'text.primary' } }>
           <ShareOutlinedIcon />
         </IconButton>
+        { onToggleSave && (
+          <IconButton
+            onClick={ () => onToggleSave(post) }
+            aria-label="저장"
+            sx={ { width: 44, height: 44, ml: 'auto', color: isSaved ? 'primary.main' : 'text.primary' } }
+          >
+            { isSaved ? <BookmarkIcon /> : <BookmarkBorderIcon /> }
+          </IconButton>
+        ) }
       </Box>
 
       {/* 본문 · 해시태그 · 위치 */}
@@ -170,7 +183,7 @@ function PostCard({ post, isLiked, onToggleLike }) {
                 key={ tag.id }
                 label={ `#${tag.tag_name}` }
                 size="small"
-                onClick={ () => navigate('/explore') }
+                onClick={ () => navigate(`/explore?tag=${encodeURIComponent(tag.tag_name)}`) }
                 sx={ { fontSize: '0.72rem', bgcolor: 'action.hover', color: 'primary.main', fontWeight: 700 } }
               />
             )) }

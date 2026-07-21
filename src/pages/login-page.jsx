@@ -7,6 +7,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { Link as RouterLink, Navigate } from 'react-router-dom';
 import Link from '@mui/material/Link';
+import ResetPasswordDialog from '../components/ui/reset-password-dialog';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/use-auth';
 
@@ -24,6 +25,7 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
 
   if (!loading && session) return <Navigate to="/" replace />;
 
@@ -98,12 +100,24 @@ function LoginPage() {
           </Button>
         </Box>
 
-        <Typography sx={ { textAlign: 'center', fontSize: '0.85rem', color: 'text.secondary', mt: 3 } }>
+        <Typography sx={ { textAlign: 'center', fontSize: '0.85rem', color: 'text.secondary', mt: 2 } }>
+          <Link
+            component="button"
+            type="button"
+            onClick={ () => setIsResetOpen(true) }
+            sx={ { fontWeight: 700, verticalAlign: 'baseline' } }
+          >
+            비밀번호를 잊으셨나요?
+          </Link>
+        </Typography>
+        <Typography sx={ { textAlign: 'center', fontSize: '0.85rem', color: 'text.secondary', mt: 1.5 } }>
           아직 계정이 없나요?{ ' ' }
           <Link component={ RouterLink } to="/signup" sx={ { fontWeight: 700 } }>
             회원가입
           </Link>
         </Typography>
+
+        <ResetPasswordDialog isOpen={ isResetOpen } onClose={ () => setIsResetOpen(false) } />
       </Container>
     </Box>
   );

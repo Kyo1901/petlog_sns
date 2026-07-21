@@ -4,6 +4,10 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -14,6 +18,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AppHeader from '../components/common/app-header';
 import UnsplashPicker from '../components/ui/unsplash-picker';
 import { useAuth } from '../hooks/use-auth';
+import { clearPostDraft, getPostDraft, savePostDraft } from '../utils/post-draft';
 import { createPost, fetchPostById, searchHashtags, updatePost } from '../utils/posts-api';
 
 const MAX_IMAGES = 10;
@@ -44,6 +49,56 @@ function CreatePostPage() {
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoaded, setIsLoaded] = useState(!isEdit);
+  const [isDraftPromptOpen, setIsDraftPromptOpen] = useState(false);
+  const [isRestorePromptOpen, setIsRestorePromptOpen] = useState(false);
+
+  /* 새 글 작성 진입 시 임시저장 글이 있으면 불러오기 제안 */
+  useEffect(() => {
+    if (!isEdit && getPostDraft()) setIsRestorePromptOpen(true);
+  }, [isEdit]);
+
+  /** 작성 중인 내용이 있는지 (임시저장 여부 판단) */
+  const hasContent = caption.trim() !== '' || imageUrls.length > 0 || tags.length > 0 || location.trim() !== '';
+
+  /** 뒤로가기 — 작성 중이면 임시저장 팝업 표시 */
+  const handleBack = () => {
+    if (!isEdit && hasContent) {
+      setIsDraftPromptOpen(true);
+      return;
+    }
+    navigate(-1);
+  };
+
+  /** 임시저장 팝업 — 저장 후 나가기 */
+  const handleSaveDraft = () => {
+    savePostDraft({ petId, caption, location, imageUrls, tags });
+    navigate(-1);
+  };
+
+  /** 임시저장 팝업 — 저장하지 않고 나가기 */
+  const handleDiscardDraft = () => {
+    clearPostDraft();
+    navigate(-1);
+  };
+
+  /** 임시저장 글 불러오기 */
+  const handleRestoreDraft = () => {
+    const draft = getPostDraft();
+    if (draft) {
+      if (draft.petId && pets.some((pet) => pet.id === draft.petId)) setPetId(draft.petId);
+      setCaption(draft.caption ?? '');
+      setLocation(draft.location ?? '');
+      setImageUrls(Array.isArray(draft.imageUrls) ? draft.imageUrls.slice(0, MAX_IMAGES) : []);
+      setTags(Array.isArray(draft.tags) ? draft.tags : []);
+    }
+    setIsRestorePromptOpen(false);
+  };
+
+  /** 임시저장 글 무시하고 새로 작성 */
+  const handleIgnoreDraft = () => {
+    clearPostDraft();
+    setIsRestorePromptOpen(false);
+  };
 
   /* 수정 모드 — 기존 게시물 불러오기 (내 게시물이 아니면 홈으로) */
   useEffect(() => {
@@ -112,6 +167,7 @@ function CreatePostPage() {
         navigate(`/post/${postId}`, { replace: true });
       } else {
         await createPost({ petId, caption, location, imageUrls, tagNames: tags });
+        clearPostDraft();
         navigate('/', { replace: true });
       }
     } catch (submitError) {
@@ -131,7 +187,7 @@ function CreatePostPage() {
 
   return (
     <Box sx={ { pb: 6 } }>
-      <AppHeader title={ isEdit ? '게시물 수정' : '새 게시물' } hasBack>
+      <AppHeader title={ isEdit ? '게시물 수정' : '새 게시물' } hasBack onBack={ handleBack }>
         <Button onClick={ handleSubmit } disabled={ isSaving } sx={ { fontWeight: 900 } }>
           { isSaving ? '저장 중...' : isEdit ? '수정' : '공유' }
         </Button>
@@ -282,6 +338,35 @@ function CreatePostPage() {
         onSelect={ handleAddFromUnsplash }
         maxCount={ MAX_IMAGES - imageUrls.length }
       />
+
+      {/* 나가기 전 임시저장 확인 팝업 */}
+      <Dialog open={ isDraftPromptOpen } onClose={ () => setIsDraftPromptOpen(false) } fullWidth maxWidth="xs">
+        <DialogTitle sx={ { fontWeight: 900, fontSize: '1.05rem' } }>임시저장하시겠습니까?</DialogTitle>
+        <DialogContent>
+          <Typography sx={ { fontSize: '0.85rem', color: 'text.secondary' } }>
+            저장하면 다음에 이어서 작성할 수 있어요.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={ { px: 3, pb: 2 } }>
+          <Button color="inherit" onClick={ handleDiscardDraft }>삭제</Button>
+          <Button onClick={ () => setIsDraftPromptOpen(false) }>계속 작성</Button>
+          <Button variant="contained" onClick={ handleSaveDraft } sx={ { fontWeight: 700 } }>임시저장</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 임시저장 글 불러오기 팝업 */}
+      <Dialog open={ isRestorePromptOpen } onClose={ handleIgnoreDraft } fullWidth maxWidth="xs">
+        <DialogTitle sx={ { fontWeight: 900, fontSize: '1.05rem' } }>임시저장된 글이 있어요</DialogTitle>
+        <DialogContent>
+          <Typography sx={ { fontSize: '0.85rem', color: 'text.secondary' } }>
+            이어서 작성할까요? 새로 작성하면 임시저장 글은 삭제됩니다.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={ { px: 3, pb: 2 } }>
+          <Button color="inherit" onClick={ handleIgnoreDraft }>새로 작성</Button>
+          <Button variant="contained" onClick={ handleRestoreDraft } sx={ { fontWeight: 700 } }>불러오기</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -13,6 +13,8 @@ import MenuItem from '@mui/material/MenuItem';
 import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import BookmarkIcon from '@mui/icons-material/Bookmark';
+import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -25,10 +27,15 @@ import AppHeader from '../components/common/app-header';
 import PetAvatar from '../components/common/pet-avatar';
 import CommentItem from '../components/ui/comment-item';
 import ImageSlider from '../components/ui/image-slider';
+import ReportDialog from '../components/ui/report-dialog';
+import SavePostSheet from '../components/ui/save-post-sheet';
 import { useAuth } from '../hooks/use-auth';
+import { useBlocks } from '../hooks/use-blocks';
 import { addComment, deleteComment, fetchComments, toggleReaction } from '../utils/comments-api';
 import { formatRelativeTime } from '../utils/format-date';
 import { deletePost, fetchLikedPostIds, fetchPostById, setLike } from '../utils/posts-api';
+import { fetchSavedPostIds, savePost, unsavePost } from '../utils/saved-api';
+import { blockUser } from '../utils/safety-api';
 
 /**
  * PostDetailPage 컴포넌트 — 게시물 상세 (댓글 · 답글 · 이모지 반응 · 더보기 메뉴)
@@ -42,6 +49,7 @@ function PostDetailPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
   const { user, activePet } = useAuth();
+  const { blockedUserIds, refreshBlocks } = useBlocks();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(false);
@@ -49,6 +57,10 @@ function PostDetailPage() {
   const [replyTo, setReplyTo] = useState(null);
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaveSheetOpen, setIsSaveSheetOpen] = useState(false);
+  const [reportTargetInfo, setReportTargetInfo] = useState(null);
+  const [isBlockOpen, setIsBlockOpen] = useState(false);
   const [snack, setSnack] = useState('');
   const [hasError, setHasError] = useState(false);
 
@@ -67,12 +79,16 @@ function PostDetailPage() {
           const liked = await fetchLikedPostIds(activePet.id, [row.id]);
           setIsLiked(liked.has(row.id));
         }
+        if (user) {
+          const saved = await fetchSavedPostIds(user.id, [row.id]);
+          setIsSaved(saved.has(row.id));
+        }
         await loadComments();
       } catch {
         setHasError(true);
       }
     })();
-  }, [postId, activePet, loadComments]);
+  }, [postId, activePet, user, loadComments]);
 
   if (hasError) {
     return (
@@ -93,9 +109,23 @@ function PostDetailPage() {
     );
   }
 
+  /* 차단한 사용자의 게시물은 표시하지 않음 */
+  if (post.pet && blockedUserIds.has(post.pet.user_id)) {
+    return (
+      <Box>
+        <AppHeader title="게시물" hasBack />
+        <Typography sx={ { textAlign: 'center', py: 8, color: 'text.secondary' } }>
+          차단한 사용자의 게시물입니다.
+        </Typography>
+      </Box>
+    );
+  }
+
   const isMyPost = post.pet?.user_id === user?.id;
-  const topComments = comments.filter((c) => !c.parent_comment_id);
-  const repliesOf = (parentId) => comments.filter((c) => c.parent_comment_id === parentId);
+  /* 차단한 사용자의 댓글도 노출 제외 */
+  const visibleComments = comments.filter((c) => !blockedUserIds.has(c.pet?.user_id));
+  const topComments = visibleComments.filter((c) => !c.parent_comment_id);
+  const repliesOf = (parentId) => visibleComments.filter((c) => c.parent_comment_id === parentId);
 
   /** 좋아요 토글 (낙관적 업데이트) */
   const handleToggleLike = async () => {
@@ -138,6 +168,34 @@ function PostDetailPage() {
     await loadComments();
   };
 
+  /** 북마크 탭 — 저장 시 컬렉션 선택 시트, 저장 상태면 해제 */
+  const handleToggleSave = async () => {
+    if (!user) return;
+    if (isSaved) {
+      setIsSaved(false);
+      try {
+        await unsavePost(user.id, post.id);
+        setSnack('저장을 해제했습니다');
+      } catch {
+        setIsSaved(true);
+      }
+      return;
+    }
+    setIsSaveSheetOpen(true);
+  };
+
+  /** 컬렉션 선택 완료 — 게시물 저장 */
+  const handleSaveToCollection = async (collectionId) => {
+    setIsSaveSheetOpen(false);
+    setIsSaved(true);
+    try {
+      await savePost({ userId: user.id, postId: post.id, collectionId });
+      setSnack('게시물을 저장했습니다');
+    } catch {
+      setIsSaved(false);
+    }
+  };
+
   /** 게시물 링크 복사 */
   const handleCopyLink = async () => {
     const url = `${window.location.origin}${window.location.pathname}#/post/${post.id}`;
@@ -150,6 +208,18 @@ function PostDetailPage() {
   const handleDeletePost = async () => {
     await deletePost(post.id);
     navigate('/', { replace: true });
+  };
+
+  /** 게시물 작성자 차단 */
+  const handleBlockUser = async () => {
+    setIsBlockOpen(false);
+    try {
+      await blockUser(user.id, post.pet.user_id);
+      refreshBlocks();
+      navigate('/', { replace: true });
+    } catch {
+      setSnack('차단에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -193,6 +263,13 @@ function PostDetailPage() {
         <Typography sx={ { fontSize: '0.85rem', fontWeight: 700, mr: 1.5 } }>{ post.likes_count }</Typography>
         <ChatBubbleOutlineIcon sx={ { fontSize: 22, mr: 0.7 } } />
         <Typography sx={ { fontSize: '0.85rem', fontWeight: 700 } }>{ post.comments_count }</Typography>
+        <IconButton
+          onClick={ handleToggleSave }
+          aria-label="저장"
+          sx={ { width: 44, height: 44, ml: 'auto', color: isSaved ? 'primary.main' : 'text.primary' } }
+        >
+          { isSaved ? <BookmarkIcon /> : <BookmarkBorderIcon /> }
+        </IconButton>
       </Box>
 
       {/* 본문 */}
@@ -207,7 +284,7 @@ function PostDetailPage() {
                 key={ tag.id }
                 label={ `#${tag.tag_name}` }
                 size="small"
-                onClick={ () => navigate('/explore') }
+                onClick={ () => navigate(`/explore?tag=${encodeURIComponent(tag.tag_name)}`) }
                 sx={ { fontSize: '0.72rem', bgcolor: 'action.hover', color: 'primary.main', fontWeight: 700 } }
               />
             )) }
@@ -240,6 +317,7 @@ function PostDetailPage() {
               onReply={ setReplyTo }
               onDelete={ handleDeleteComment }
               onToggleReaction={ handleToggleReaction }
+              onReport={ (target) => setReportTargetInfo({ type: '댓글', id: target.id }) }
             />
             { repliesOf(comment.id).map((reply) => (
               <CommentItem
@@ -250,6 +328,7 @@ function PostDetailPage() {
                 isReply
                 onDelete={ handleDeleteComment }
                 onToggleReaction={ handleToggleReaction }
+                onReport={ (target) => setReportTargetInfo({ type: '댓글', id: target.id }) }
               />
             )) }
           </Box>
@@ -310,7 +389,58 @@ function PostDetailPage() {
           </MenuItem>
         ) }
         <MenuItem onClick={ handleCopyLink }>링크 복사 (공유)</MenuItem>
+        <MenuItem onClick={ () => { setMenuAnchor(null); handleToggleSave(); } }>
+          { isSaved ? '저장 해제' : '저장' }
+        </MenuItem>
+        { !isMyPost && (
+          <MenuItem
+            onClick={ () => { setMenuAnchor(null); setReportTargetInfo({ type: '게시물', id: post.id }); } }
+            sx={ { color: 'error.main' } }
+          >
+            신고
+          </MenuItem>
+        ) }
+        { !isMyPost && (
+          <MenuItem
+            onClick={ () => { setMenuAnchor(null); setIsBlockOpen(true); } }
+            sx={ { color: 'error.main' } }
+          >
+            차단
+          </MenuItem>
+        ) }
       </Menu>
+
+      {/* 신고 다이얼로그 (게시물 · 댓글 공용) */}
+      <ReportDialog
+        isOpen={ Boolean(reportTargetInfo) }
+        onClose={ () => setReportTargetInfo(null) }
+        userId={ user?.id }
+        targetType={ reportTargetInfo?.type ?? '게시물' }
+        targetId={ reportTargetInfo?.id ?? 0 }
+      />
+
+      {/* 차단 확인 다이얼로그 */}
+      <Dialog open={ isBlockOpen } onClose={ () => setIsBlockOpen(false) }>
+        <DialogTitle sx={ { fontWeight: 900 } }>{ post.pet?.name }님의 보호자를 차단할까요?</DialogTitle>
+        <DialogContent>
+          <Typography sx={ { fontSize: '0.85rem', color: 'text.secondary' } }>
+            차단하면 상대의 게시물 · 댓글이 보이지 않아요.
+            차단 목록은 마이페이지 &gt; 설정에서 관리할 수 있어요.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={ () => setIsBlockOpen(false) }>취소</Button>
+          <Button onClick={ handleBlockUser } color="error" variant="contained">차단</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 컬렉션 선택 시트 */}
+      <SavePostSheet
+        isOpen={ isSaveSheetOpen }
+        onClose={ () => setIsSaveSheetOpen(false) }
+        onSave={ handleSaveToCollection }
+        userId={ user?.id }
+      />
 
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={ isDeleteOpen } onClose={ () => setIsDeleteOpen(false) }>
